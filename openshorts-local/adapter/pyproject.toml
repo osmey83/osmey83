@@ -1,0 +1,16 @@
+[project]
+name = "rvshorts"
+version = "0.1.0"
+description = "Proyectos de clips verticales sobre OpenShorts + Ollama + FFmpeg (adaptador independiente)"
+requires-python = ">=3.10"
+dependencies = []          # solo biblioteca estándar
+
+[project.scripts]
+rvshorts = "rvshorts.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rvshorts"]
