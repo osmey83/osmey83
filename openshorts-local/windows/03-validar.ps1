@@ -42,7 +42,9 @@ catch { Record 'instalacion' 'API /health' $false $_ }
 Record 'instalacion' 'adaptador rvshorts' (Test-Path $rv) $rv
 
 Write-Step 'GPU dentro del contenedor (RTX 5090 / Blackwell)'
-$smi = (& docker exec openshorts-backend nvidia-smi -L 2>&1 | Out-String).Trim()
+# Con Docker Desktop + WSL 2, nvidia-smi suele estar en /usr/lib/wsl/lib, fuera del PATH.
+$smi = ((Invoke-Native 'docker' @('exec', 'openshorts-backend', 'sh', '-c',
+        'nvidia-smi -L 2>/dev/null || /usr/lib/wsl/lib/nvidia-smi -L')) | Out-String).Trim()
 Record 'gpu' 'nvidia-smi en contenedor' ($LASTEXITCODE -eq 0) $smi
 $t = DockerPy "import torch;ok=torch.cuda.is_available();print(ok, torch.__version__, torch.version.cuda, torch.cuda.get_device_capability(0) if ok else '-', torch.cuda.get_arch_list() if ok else '-')"
 Record 'gpu' 'torch CUDA (sm_120)' ($t.ok -and $t.out -match '(?m)^True' -and $t.out -match 'sm_120|\(12, 0\)') $t.out
