@@ -4,10 +4,12 @@
 
 $OS_REPO      = 'https://github.com/mutonby/openshorts.git'
 $OS_COMMIT    = 'c4b496a73747664d9d0864b19c34085303e90d14'   # auditado el 2026-11-17
-$OS_DIR       = 'D:\AI\openshorts'                           # instalación aislada (D: tiene espacio; C: ~121 GB libres)
+# Todo en D: dentro de Comfy Desktop, en su propia subcarpeta (no toca ComfyUI).
+# La carpeta final se llama 'openshorts' porque Docker Compose usa ese nombre de proyecto.
+$OS_DIR       = 'D:\Comfy Desktop\OpenShorts\openshorts'
 $KIT_DIR      = Split-Path -Parent $PSScriptRoot             # ...\openshorts-local
 $STATE_DIR    = Join-Path $env:LOCALAPPDATA 'openshorts-local'
-$PROYECTOS    = 'D:\AI\OpenShortsProyectos'
+$PROYECTOS    = 'D:\Comfy Desktop\OpenShorts\proyectos'
 
 # Puertos del host. 8000/5175/3100 son los de OpenShorts; si están ocupados,
 # 01-instalar.ps1 elige otros y los guarda en config.local.ps1.

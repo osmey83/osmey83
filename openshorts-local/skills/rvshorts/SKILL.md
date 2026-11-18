@@ -7,7 +7,7 @@ description: Produce vertical clips (YouTube Shorts, TikTok, Reels) from LOCAL v
 
 CLI: `%LOCALAPPDATA%\openshorts-local\rvshorts.cmd` (en adelante `rvshorts`;
 ya lleva el puerto, el modelo y la carpeta de este equipo).
-Proyectos en `D:\AI\OpenShortsProyectos\<proyecto>`.
+Proyectos en `D:\Comfy Desktop\OpenShorts\proyectos\<proyecto>`.
 
 ## Antes de empezar
 1. `rvshorts diagnostico` — OpenShorts, Ollama CPU (:11435) y encoders. Si falla,

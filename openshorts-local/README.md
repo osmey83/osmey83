@@ -47,7 +47,7 @@ adaptador, que usa la biblioteca estándar) y Ollama. Desde `openshorts-local\wi
 # 0. Auditoría SOLO LECTURA (versiones, driver, NVENC, puertos, ComfyUI, RenderVibe)
 powershell -ExecutionPolicy Bypass -File .\00-auditar.ps1 -ProbarGpuDocker
 
-# 1. Clona OpenShorts en D:\AI\openshorts (commit fijado), .env, override GPU, venv del adaptador, build
+# 1. Clona OpenShorts en D:\Comfy Desktop\OpenShorts\openshorts (commit fijado), .env, override GPU, venv del adaptador, build
 powershell -ExecutionPolicy Bypass -File .\01-instalar.ps1
 
 # 2. Arranca Ollama-CPU (:11435) y los contenedores
@@ -85,7 +85,7 @@ O, en Claude Code: *"Saca 3 shorts de D:\Grabaciones\ep03.mp4 con rvshorts y
 enséñame los ganchos"*. La skill `rvshorts` sabe usar la CLI y tiene prohibido
 publicar o aprobar por su cuenta.
 
-Cada proyecto queda así: `D:\AI\OpenShortsProyectos\<proyecto>\`
+Cada proyecto queda así: `D:\Comfy Desktop\OpenShorts\proyectos\<proyecto>\`
 `clips\` (9:16 de OpenShorts) · `meta\clip_NN.md|.json` (ganchos, títulos,
 descripciones, hashtags, narrativa, análisis) · `exports\` (H.264/H.265) ·
 `review.json` · `publish_queue.json` (solo los aprobados, `"published": false`).

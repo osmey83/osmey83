@@ -58,5 +58,5 @@ clip-review (QA) <──────────── clips/ + meta/clip_NN.md
 | VRAM saturada durante un render | guarda de cola de ComfyUI; Ollama del kit en CPU; `ASR_GPU_CONCURRENCY=1` |
 | Choque de puertos | lista de puertos reservados en `config.ps1`; el instalador elige libres |
 | Mezcla de entornos Python | tres entornos separados; el kit nunca usa el `.venv` de RenderVibe salvo para `busy_reason()` con `-B` (sin `.pyc`) |
-| Dos asistentes editando lo mismo | solo se escribe en `openshorts-local`, `C:\AI\openshorts` y `OpenShortsProyectos` |
+| Dos asistentes editando lo mismo | solo se escribe en `openshorts-local`, `D:\Comfy Desktop\OpenShorts\` (código y proyectos) |
 | Publicación accidental | `rvshorts` no tiene comando de publicar; `publish_queue.json` con `published: false` |
