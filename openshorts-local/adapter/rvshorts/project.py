@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 STATUSES = ("pendiente", "aprobado", "rechazado")
+_CLIP_RE = re.compile(r"clip_\d{2}\.mp4")
 
 
 def _now() -> str:
@@ -119,7 +120,28 @@ class Project:
 
     def clip_files(self) -> list[str]:
         d = self.path("clips")
-        return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith(".mp4"))
+        return sorted(os.path.join(d, f) for f in os.listdir(d) if _CLIP_RE.fullmatch(f))
+
+    def begin_job_download(self, job_id: str) -> Optional[str]:
+        """Prepara clips/meta/exports para los resultados de ``job_id``.
+
+        Si ahí hay resultados de OTRO trabajo, se mueven (no se borran) a
+        historial/<job anterior>/ junto con su revisión, para que una
+        aprobación nunca quede pegada a un clip distinto. Devuelve esa ruta."""
+        rv = self.review()
+        old = rv.get("job_id")
+        has_files = any(os.listdir(self.path(s)) for s in ("clips", "meta", "exports")
+                        if os.path.isdir(self.path(s)))
+        if old == job_id or (not has_files and not rv["clips"]):
+            return None
+        dest = self.path("historial", old or f"previo-{datetime.now():%Y%m%d-%H%M%S}")
+        os.makedirs(dest, exist_ok=True)
+        for name in ("clips", "meta", "exports", "review.json", "publish_queue.json"):
+            if os.path.exists(self.path(name)):
+                shutil.move(self.path(name), os.path.join(dest, name))
+        for sub in ("clips", "meta", "exports"):
+            os.makedirs(self.path(sub), exist_ok=True)
+        return dest
 
     # -- revisión ----------------------------------------------------------
     @property
@@ -129,8 +151,10 @@ class Project:
     def review(self) -> dict:
         return _read_json(self.review_path, {"clips": {}})
 
-    def ensure_review_entries(self, n_clips: int) -> None:
+    def ensure_review_entries(self, n_clips: int, job_id: Optional[str] = None) -> None:
         rv = self.review()
+        if job_id:
+            rv["job_id"] = job_id
         for i in range(n_clips):
             rv["clips"].setdefault(str(i), {"status": "pendiente", "note": "", "at": _now()})
         _write_json(self.review_path, rv)

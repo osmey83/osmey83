@@ -232,3 +232,33 @@ def test_procesar_refuses_while_comfy_renders(tmp_path, monkeypatch, capsys):
         assert len(os_srv.process_bodies) == 1
     finally:
         comfy.close(); os_srv.close()
+
+
+@needs_ffmpeg
+def test_reprocessing_never_inherits_old_approvals(tmp_path, monkeypatch):
+    monkeypatch.setenv("RVSHORTS_COMFY_URLS", "http://127.0.0.1:9")
+    src = make_test_clip(str(tmp_path / "largo.mp4"))
+    clip = make_test_clip(str(tmp_path / "clip.mp4"), w=1080, h=1920, seconds=2)
+    os_srv, llm_srv = FakeOpenShorts(clip, n_clips=2), FakeLLM()
+    root = str(tmp_path / "proyectos")
+    base = ["--openshorts", os_srv.url, "--llm-url", llm_srv.url + "/v1", "--raiz", root]
+    try:
+        assert main(base + ["pipeline", "ep", src, "--intervalo", "0.01"]) == 0
+        p = Project(root, "ep")
+        first_job = p.last_job()
+        assert main(base + ["aprobar", "ep", "1"]) == 0
+
+        os_srv.n_clips = 1                                   # el nuevo trabajo da 1 clip
+        assert main(base + ["pipeline", "ep", src, "--intervalo", "0.01"]) == 0
+        assert p.last_job() != first_job
+        assert [os.path.basename(f) for f in p.clip_files()] == ["clip_00.mp4"]
+        rv = p.review()
+        assert rv["job_id"] == p.last_job()
+        assert {k: v["status"] for k, v in rv["clips"].items()} == {"0": "pendiente"}
+        assert not os.path.exists(p.path("publish_queue.json"))
+        old = p.path("historial", first_job)
+        old_rv = json.load(open(os.path.join(old, "review.json"), encoding="utf-8"))
+        assert old_rv["clips"]["1"]["status"] == "aprobado"      # movido, no borrado
+        assert len(os.listdir(os.path.join(old, "clips"))) == 2
+    finally:
+        os_srv.close(); llm_srv.close()

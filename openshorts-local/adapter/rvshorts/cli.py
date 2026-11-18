@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 from typing import Optional
 
@@ -121,11 +122,13 @@ def cmd_descargar(args) -> int:
     if not clips:
         log("OpenShorts terminó sin clips.")
         return 1
+    moved = p.begin_job_download(job_id)
+    if moved:
+        log(f"Resultados del trabajo anterior movidos a {moved} (no se borra nada).")
     for i, clip in enumerate(clips):
         dest = p.path("clips", f"clip_{i:02d}.mp4")
         local = _local_clip_path(job_id, clip.get("video_url", ""))
         if local:
-            import shutil
             shutil.copy2(local, dest)
         else:
             os_client.download(clip.get("download_url") or clip["video_url"], dest)
@@ -133,7 +136,7 @@ def cmd_descargar(args) -> int:
         _write_json(p.path("meta", f"clip_{i:02d}.transcript.json"), tr)
         log(f"  clip {i:02d}: {clip.get('title', '')!r} "
             f"({clip.get('start', 0):.1f}–{clip.get('end', 0):.1f}s)")
-    p.ensure_review_entries(len(clips))
+    p.ensure_review_entries(len(clips), job_id)
     log(f"{len(clips)} clips en {p.path('clips')}")
     return 0
 
