@@ -59,7 +59,7 @@ docs.ollama.com/gpu.
 | 4 | Subida en streaming (`POST /api/uploads` + `PUT`) | contenedor | **OK**: 5 597 258 bytes, idénticos al original |
 | 5 | Error: fuente < 45 s | backend real | **OK**: HTTP 400 con mensaje claro, que el adaptador muestra (rc 2) |
 | 6 | `/api/process` → cola → worker → `/api/status` | backend real | **OK hasta el worker**; el trabajo falla porque en el contenedor no hay torch/ultralytics (PyTorch, HuggingFace y las descargas de GitHub están bloqueados por la red). El adaptador informó del error con el log real (rc 2) |
-| 7 | Adaptador: 22 tests (JSON del LLM, reintentos, *fallback* de `response_format`, normalización, proyecto/aprobación, exportación H.264/H.265, extremo a extremo con servidores simulados, guarda de ComfyUI, errores) | contenedor | **22 OK** |
+| 7 | Adaptador: 23 tests (JSON del LLM, reintentos, *fallback* de `response_format`, normalización, proyecto/aprobación, exportación H.264/H.265, extremo a extremo con servidores simulados, guarda de ComfyUI, errores) | contenedor | **23 OK** |
 | 8 | Exportación real H.265 del video de demostración | contenedor (libx265) | **OK**: 1080×1920, `hevc`/`hvc1`, AAC, 41,77 s; fotograma revisado a ojo (16:9 sin deformar) |
 | 9 | Instalación, Docker GPU, torch `sm_120`, kernel Whisper en CUDA, ONNX CUDA | Windows | **Pendiente**: `03-validar.ps1` |
 | 10 | NVENC h264/hevc (contenedor y host) | Windows | **Pendiente** |
@@ -67,6 +67,24 @@ docs.ollama.com/gpu.
 | 12 | MCP HTTP y registro en Claude Code | Windows | **Pendiente** |
 | 13 | Pipeline completo con un video real (clips 9:16 de 15-60 s, transcripción, metadatos, H.265, revisión pendiente) | Windows | **Pendiente** |
 | 14 | Calidad visual de los subtítulos dinámicos | Windows | **Pendiente**: revisión humana (no se puede comprobar por script) |
+
+## 4b. Revisión independiente de los scripts PowerShell (2026-11-18)
+
+Un revisor sin el contexto de quien escribió los scripts los leyó contra
+Windows PowerShell 5.1 (tampoco pudo ejecutarlos). Corregido:
+
+- `00-auditar.ps1` no se podía ni analizar: `"$drv:"` se lee como unidad. Ahora es `${drv}`.
+- `01-instalar.ps1`: encadenar `.Replace()` con salto de línea no es válido en 5.1. Además, con `Stop`, cualquier línea en stderr de `py`, `git` o `docker` abortaba el script; ahora pasan por `Invoke-Native` y se comprueba `$LASTEXITCODE`.
+- `core.autocrlf=false` se guarda en el clon: con CRLF se rompería `bin/ffmpeg` dentro del contenedor.
+- Override sin GPU y sin cambio de puertos: `backend:` ya no queda vacío.
+- `03-validar.ps1`: la comprobación de 9:16 leía mal ffprobe y ahora lo lee en JSON. Los argumentos con comas iban sin comillas (también en las llamadas a nvidia-smi). El adaptador no recibía el puerto ni el modelo del kit. La prueba de error 404 no podía fallar nunca.
+- `iniciar.ps1`: Ollama del kit sin Vulkan (además de sin CUDA). `OLLAMA_HOST` se restaura tras `ollama pull`.
+- `detener.ps1`: `taskkill /T` para que los procesos *runner* liberen la RAM del modelo.
+- La auditoría ya no importa código de RenderVibe salvo con `-ConsultarRenderVibe`.
+
+En el adaptador se corrigió además que, al reprocesar un proyecto, se heredaran
+aprobaciones de clips anteriores. Lo anterior ahora se mueve a `historial/<job>/`
+(test de regresión incluido; 23 tests OK).
 
 ## 5. Funciones disponibles tras instalar (si la validación pasa)
 

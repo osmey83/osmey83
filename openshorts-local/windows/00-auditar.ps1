@@ -3,13 +3,17 @@
   Auditoría SOLO LECTURA del equipo antes de instalar OpenShorts.
   No instala, no modifica, no descarga nada (salvo -ProbarGpuDocker, que
   descarga la imagen oficial nvidia/cuda para probar la GPU en Docker).
+.PARAMETER ConsultarRenderVibe
+  Además llama a busy_reason() de RenderVibe con su .venv (python -B). Eso
+  IMPORTA código de RenderVibe; por eso no se hace sin este interruptor.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\00-auditar.ps1
   powershell -ExecutionPolicy Bypass -File .\00-auditar.ps1 -ProbarGpuDocker
 #>
 param(
     [string]$RenderVibe = 'C:\Users\ROG\Documents\Codex\2026-11-06\referenced-chatgpt-conversation-this-is-an-2\Miniserie-Studio',
-    [switch]$ProbarGpuDocker
+    [switch]$ProbarGpuDocker,
+    [switch]$ConsultarRenderVibe
 )
 $ErrorActionPreference = 'Continue'
 . "$PSScriptRoot\config.ps1"
@@ -29,16 +33,16 @@ Write-Ok "$($r.windows) · $($r.ram_gb) GB RAM · $($r.cpu) ($($r.cpu_hilos) hil
 Write-Step 'GPU NVIDIA (Blackwell = compute capability 12.0)'
 $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($smi) {
-    $q = & nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader 2>&1
+    $q = & nvidia-smi '--query-gpu=name,driver_version,memory.total,compute_cap' '--format=csv,noheader' 2>&1
     $r.gpu = "$q".Trim()
     Write-Ok $r.gpu
     $drv = ("$q" -split ',')[1].Trim()
     $major = [int](($drv -split '\.')[0])
     $r.driver_major = $major
     if ($major -ge 580) { Write-Ok "Driver $drv >= R580: compatible con la imagen GPU de OpenShorts (torch 2.11 / CUDA 13)" }
-    elseif ($major -ge 570) { Write-Warn2 "Driver $drv: soporta la 5090 y CUDA 12.8, pero la imagen GPU de OpenShorts usa CUDA 13 (R580+). NVENC y Whisper (CUDA 12) deberían ir; torch en GPU no. No se actualiza nada automáticamente." }
+    elseif ($major -ge 570) { Write-Warn2 "Driver ${drv}: soporta la 5090 y CUDA 12.8, pero la imagen GPU de OpenShorts usa CUDA 13 (R580+). NVENC y Whisper (CUDA 12) deberían ir; torch en GPU no. No se actualiza nada automáticamente." }
     else { Write-Bad "Driver $drv < 570: la RTX 5090 necesita R570+." }
-    $uso = & nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>&1
+    $uso = & nvidia-smi '--query-compute-apps=pid,process_name,used_memory' '--format=csv,noheader' 2>&1
     $r.gpu_procesos = "$uso".Trim()
     if ($r.gpu_procesos) { Write-Host "  Procesos usando la GPU ahora: $($r.gpu_procesos)" }
 } else { Write-Bad 'nvidia-smi no encontrado'; $r.gpu = $null }
@@ -152,8 +156,10 @@ if ($rv.existe) {
     $rv.venvs = @(Get-ChildItem $RenderVibe -Recurse -Depth 3 -Filter 'pyvenv.cfg' -File -ErrorAction SilentlyContinue |
                   ForEach-Object { $_.DirectoryName.Substring($RenderVibe.Length) })
     # Estado del estudio con SU propio .venv; -B para no escribir .pyc en el proyecto.
+    # Solo con -ConsultarRenderVibe: importa backend.launcher de RenderVibe
+    # (ejecuta su código al importarlo), así que no va por defecto.
     $rvPy = Join-Path $RenderVibe '.venv\Scripts\python.exe'
-    if (Test-Path $rvPy) {
+    if ($ConsultarRenderVibe -and (Test-Path $rvPy)) {
         Push-Location $RenderVibe
         try { $rv.busy_reason = (& $rvPy -B -c "from backend.launcher import busy_reason; print(busy_reason(check_comfy=False))" 2>&1 | Out-String).Trim() }
         finally { Pop-Location }

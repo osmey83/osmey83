@@ -12,14 +12,14 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { throw 'No se encu
 
 Write-Step 'Servidor MCP'
 $url = "http://localhost:$PORT_BACKEND/mcp"
-$list = (& claude mcp list 2>&1 | Out-String)
+$list = ((Invoke-Native 'claude' @('mcp', 'list')) | Out-String)
 if ($list -match '(?m)^openshorts:') {
     Write-Ok 'Ya existe una entrada "openshorts":'
     Write-Host ($list -split "`n" | Where-Object { $_ -match '^openshorts:' })
     Write-Host "  Si apunta a otra URL: claude mcp remove openshorts -s $Scope  y repite."
 } else {
-    & claude mcp add --transport http --scope $Scope openshorts $url
-    if ($LASTEXITCODE -ne 0) { throw 'claude mcp add falló' }
+    $addOut = Invoke-Native 'claude' @('mcp', 'add', '--transport', 'http', '--scope', $Scope, 'openshorts', $url)
+    if ($LASTEXITCODE -ne 0) { throw "claude mcp add falló: $($addOut -join ' ')" }
     Write-Ok "Registrado openshorts -> $url (scope $Scope)"
 }
 

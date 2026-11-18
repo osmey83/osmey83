@@ -49,16 +49,17 @@ foreach ($exe in 'git', 'docker') {
         throw "Falta $exe. Instálalo (Git for Windows / Docker Desktop con backend WSL2) y repite."
     }
 }
-$null = & docker info 2>&1
+$null = Invoke-Native 'docker' @('info')
 if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop no está arrancado.' }
-$composeVer = (& docker compose version --short 2>&1 | Out-String).Trim()
+$composeVer = ((Invoke-Native 'docker' @('compose', 'version', '--short')) | Out-String).Trim()
 Write-Ok "docker compose $composeVer"
 $py = $null
 foreach ($cand in @('py -3.12', 'py -3.11', 'py -3', 'python')) {
     $parts = $cand -split ' '
     if (Get-Command $parts[0] -ErrorAction SilentlyContinue) {
-        $v = & $parts[0] @($parts[1..9] | Where-Object { $_ }) -c "import sys;print(sys.version_info>=(3,10))" 2>$null
-        if ("$v".Trim() -eq 'True') { $py = $parts; break }
+        $pyArgs = @($parts[1..9] | Where-Object { $_ }) + @('-c', 'import sys;print(sys.version_info>=(3,10))')
+        $v = Invoke-Native $parts[0] $pyArgs
+        if ($LASTEXITCODE -eq 0 -and ("$v".Trim() -match '(?m)^True$')) { $py = $parts; break }
     }
 }
 if (-not $py) { throw 'Hace falta Python 3.10+ para el adaptador (no se instala nada global).' }
@@ -68,22 +69,26 @@ Write-Ok "Python para el adaptador: $($py -join ' ')"
 Write-Step "2/6 OpenShorts en $OS_DIR (commit $($OS_COMMIT.Substring(0,7)))"
 if (Test-Path (Join-Path $OS_DIR '.git')) {
     Push-Location $OS_DIR
-    $dirty = (& git status --porcelain --untracked-files=no | Out-String).Trim()
+    $null = Invoke-Native 'git' @('config', 'core.autocrlf', 'false')
+    $dirty = ((Invoke-Native 'git' @('status', '--porcelain', '--untracked-files=no')) | Out-String).Trim()
     if ($dirty) { Pop-Location; throw "Hay cambios locales en $OS_DIR; no se toca. Revísalos con git status." }
-    & git fetch --depth 1 origin $OS_COMMIT
-    & git -c advice.detachedHead=false checkout --quiet $OS_COMMIT
+    $null = Invoke-Native 'git' @('fetch', '--depth', '1', 'origin', $OS_COMMIT)
+    $null = Invoke-Native 'git' @('-c', 'advice.detachedHead=false', 'checkout', '--quiet', $OS_COMMIT)
+    $rcGit = $LASTEXITCODE
     Pop-Location
+    if ($rcGit -ne 0) { throw "git checkout $OS_COMMIT falló" }
 } elseif (Test-Path $OS_DIR) {
     throw "$OS_DIR existe y no es un repositorio git; elige otra carpeta en config.local.ps1"
 } else {
     New-Item -ItemType Directory -Path $OS_DIR -Force | Out-Null
-    & git -c core.autocrlf=false clone --filter=blob:none $OS_REPO $OS_DIR
+    # --config (no -c) deja core.autocrlf=false GUARDADO en el repo: los
+    # scripts sh del contenedor (bin/ffmpeg) necesitan finales LF.
+    $null = Invoke-Native 'git' @('clone', '--config', 'core.autocrlf=false', '--filter=blob:none', $OS_REPO, $OS_DIR)
     if ($LASTEXITCODE -ne 0) { throw 'git clone falló' }
-    Push-Location $OS_DIR
-    & git -c advice.detachedHead=false checkout --quiet $OS_COMMIT
-    Pop-Location
+    $null = Invoke-Native 'git' @('-C', $OS_DIR, '-c', 'advice.detachedHead=false', 'checkout', '--quiet', $OS_COMMIT)
+    if ($LASTEXITCODE -ne 0) { throw "git checkout $OS_COMMIT falló" }
 }
-$head = (& git -C $OS_DIR rev-parse HEAD).Trim()
+$head = ((Invoke-Native 'git' @('-C', $OS_DIR, 'rev-parse', 'HEAD')) | Out-String).Trim()
 if ($head -ne $OS_COMMIT) { throw "HEAD $head no coincide con el commit auditado" }
 Write-Ok "Código en $head (licencia MIT)"
 
@@ -92,7 +97,7 @@ Write-Step '3/6 Puertos'
 $owners = @{}
 foreach ($p in $PORT_BACKEND, $PORT_FRONTEND, $PORT_RENDERER) { $owners[$p] = Get-PortOwner $p }
 # Si los ocupa el propio OpenShorts (reinstalación), se mantienen.
-$ours = (& docker ps --filter 'name=openshorts-' --format '{{.Names}}' 2>$null | Out-String).Trim()
+$ours = ((Invoke-Native 'docker' @('ps', '--filter', 'name=openshorts-', '--format', '{{.Names}}')) | Out-String).Trim()
 if ($ours) {
     Write-Ok "OpenShorts ya está corriendo ($ours); se conservan sus puertos."
     $pb, $pf, $pr = $PORT_BACKEND, $PORT_FRONTEND, $PORT_RENDERER
@@ -125,12 +130,12 @@ $ovPath  = Join-Path $OS_DIR 'docker-compose.override.yml'
 $whisperDevice = 'cuda'; $whisperCompute = 'float16'; $whisperModel = 'large-v3-turbo'
 if ($SinGpu) { $whisperDevice = 'cpu'; $whisperCompute = 'int8'; $whisperModel = 'small' }
 
-$envBody = (Get-Content (Join-Path $PSScriptRoot 'plantillas\openshorts.env') -Raw).
-    Replace('{{OLLAMA_CPU_PORT}}', "$OLLAMA_CPU_PORT").
-    Replace('{{LLM_MODEL}}', $LLM_MODEL).
-    Replace('{{WHISPER_MODEL}}', $whisperModel).
-    Replace('{{WHISPER_DEVICE}}', $whisperDevice).
-    Replace('{{WHISPER_COMPUTE}}', $whisperCompute)
+$envBody = Get-Content (Join-Path $PSScriptRoot 'plantillas\openshorts.env') -Raw
+$envBody = $envBody.Replace('{{OLLAMA_CPU_PORT}}', "$OLLAMA_CPU_PORT")
+$envBody = $envBody.Replace('{{LLM_MODEL}}', $LLM_MODEL)
+$envBody = $envBody.Replace('{{WHISPER_MODEL}}', $whisperModel)
+$envBody = $envBody.Replace('{{WHISPER_DEVICE}}', $whisperDevice)
+$envBody = $envBody.Replace('{{WHISPER_COMPUTE}}', $whisperCompute)
 if ((Test-Path $envPath) -and -not $Forzar) {
     Write-Warn2 ".env ya existe: no se modifica. Compáralo con plantillas\openshorts.env o usa -Forzar."
 } else {
@@ -160,6 +165,8 @@ $gpuBlock = @"
               capabilities: [gpu, video]
 "@
 if ($SinGpu) { $gpuBlock = '' }
+$backendBody = ($gpuBlock + $ports).Trim()
+if (-not $backendBody) { $gpuBlock = "    environment: {}`n" }   # backend: no puede quedar vacío
 $ov = @"
 # Generado por openshorts-local/windows/01-instalar.ps1 — ver README del kit.
 services:
@@ -186,8 +193,9 @@ if ((Test-Path $ovPath) -and -not $Forzar) {
     Write-Ok 'docker-compose.override.yml escrito'
 }
 Push-Location $OS_DIR
-$null = & docker compose config --quiet 2>&1
+$cfgOut = Invoke-Native 'docker' @('compose', 'config', '--quiet')
 $okCfg = ($LASTEXITCODE -eq 0)
+if (-not $okCfg) { Write-Host ($cfgOut -join "`n") }
 Pop-Location
 if (-not $okCfg) { throw 'docker compose config no valida el override; revisa docker-compose.override.yml' }
 Write-Ok 'docker compose config válido'
@@ -196,9 +204,11 @@ Write-Ok 'docker compose config válido'
 Write-Step '5/6 Adaptador rvshorts (venv propio)'
 $venv = Join-Path $STATE_DIR 'venv-rvshorts'
 if (-not (Test-Path (Join-Path $venv 'Scripts\python.exe'))) {
-    & $py[0] @($py[1..9] | Where-Object { $_ }) -m venv $venv
+    $null = Invoke-Native $py[0] (@($py[1..9] | Where-Object { $_ }) + @('-m', 'venv', $venv))
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo crear el venv del adaptador' }
 }
-& (Join-Path $venv 'Scripts\python.exe') -m pip install --quiet --disable-pip-version-check -e (Join-Path $KIT_DIR 'adapter')
+$pipOut = Invoke-Native (Join-Path $venv 'Scripts\python.exe') @('-m', 'pip', 'install', '--quiet', '--disable-pip-version-check', '-e', (Join-Path $KIT_DIR 'adapter'))
+if ($LASTEXITCODE -ne 0) { Write-Host ($pipOut -join "`n") }
 if ($LASTEXITCODE -ne 0) { throw 'pip install del adaptador falló' }
 New-Item -ItemType Directory -Path $PROYECTOS -Force | Out-Null
 Write-Ok "rvshorts en $venv · proyectos en $PROYECTOS"
@@ -207,8 +217,10 @@ Write-Ok "rvshorts en $venv · proyectos en $PROYECTOS"
 if ($SinConstruir) { Write-Warn2 'Construcción omitida (-SinConstruir).'; return }
 Write-Step '6/6 docker compose build (la imagen GPU tarda y ocupa ~10-15 GB)'
 Push-Location $OS_DIR
+$prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 & docker compose build
 $rc = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
 Pop-Location
 if ($rc -ne 0) { throw "docker compose build falló (código $rc)" }
 Write-Ok 'Imagen construida. Siguiente: .\iniciar.ps1 y luego .\03-validar.ps1'

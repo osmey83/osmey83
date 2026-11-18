@@ -52,6 +52,17 @@ function Get-PortOwner([int]$port) {
     return "PID $($c.OwningProcess)"
 }
 
+# PS 5.1: con $ErrorActionPreference='Stop', una línea en stderr de un
+# ejecutable nativo (git, docker, py, ollama) se convierte en excepción.
+# Invoke-Native ejecuta con 'Continue' y devuelve la salida; el éxito se
+# juzga con $LASTEXITCODE.
+function Invoke-Native([string]$exe, [string[]]$argList) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { return (& $exe @argList 2>&1 | ForEach-Object { "$_" }) }
+    finally { $ErrorActionPreference = $prev }
+}
+
 function Get-CmdVersion([string]$exe, [string[]]$argList) {
     $cmd = Get-Command $exe -ErrorAction SilentlyContinue
     if (-not $cmd) { return $null }

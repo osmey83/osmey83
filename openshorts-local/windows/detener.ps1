@@ -20,7 +20,8 @@ if (Test-Path $pidFile) {
     $owner = Get-NetTCPConnection -State Listen -LocalPort $OLLAMA_CPU_PORT -ErrorAction SilentlyContinue |
              Select-Object -First 1
     if ($p -and $p.ProcessName -like 'ollama*' -and $owner -and $owner.OwningProcess -eq $procId) {
-        Stop-Process -Id $procId; Write-Ok "Detenido PID $procId"
+        # /T: también sus procesos runner hijos (liberan la RAM del modelo).
+        & taskkill /PID $procId /T /F | Out-Null; Write-Ok "Detenido PID $procId y sus hijos"
     } else { Write-Warn2 "El PID $procId ya no es la instancia del kit; no se toca nada." }
     Remove-Item $pidFile
 } else { Write-Host '  No había instancia arrancada por el kit.' }

@@ -25,6 +25,12 @@ function DockerPy($code) {
 }
 $rv = Join-Path $STATE_DIR 'venv-rvshorts\Scripts\rvshorts.exe'
 $api = "http://localhost:$PORT_BACKEND"
+# El adaptador lee su configuración del entorno: la del kit (puertos y modelo
+# elegidos por 01-instalar.ps1), solo para este proceso.
+$env:OPENSHORTS_URL     = $api
+$env:RVSHORTS_LLM_URL   = "http://127.0.0.1:$OLLAMA_CPU_PORT/v1"
+$env:RVSHORTS_LLM_MODEL = $LLM_MODEL
+$env:RVSHORTS_PROYECTOS = $PROYECTOS
 
 Write-Step 'Instalación'
 $head = (& git -C $OS_DIR rev-parse HEAD 2>&1 | Out-String).Trim()
@@ -39,7 +45,7 @@ Write-Step 'GPU dentro del contenedor (RTX 5090 / Blackwell)'
 $smi = (& docker exec openshorts-backend nvidia-smi -L 2>&1 | Out-String).Trim()
 Record 'gpu' 'nvidia-smi en contenedor' ($LASTEXITCODE -eq 0) $smi
 $t = DockerPy "import torch;ok=torch.cuda.is_available();print(ok, torch.__version__, torch.version.cuda, torch.cuda.get_device_capability(0) if ok else '-', torch.cuda.get_arch_list() if ok else '-')"
-Record 'gpu' 'torch CUDA (sm_120)' ($t.ok -and $t.out -match '^True' -and $t.out -match 'sm_120|\(12, 0\)') $t.out
+Record 'gpu' 'torch CUDA (sm_120)' ($t.ok -and $t.out -match '(?m)^True' -and $t.out -match 'sm_120|\(12, 0\)') $t.out
 $c = DockerPy "import ctranslate2;print(ctranslate2.__version__, 'cuda_devices=', ctranslate2.get_cuda_device_count())"
 Record 'gpu' 'CTranslate2 (faster-whisper) ve la GPU' ($c.ok -and $c.out -match 'cuda_devices= [1-9]') $c.out
 $c2 = DockerPy "import numpy as np, ctranslate2; from faster_whisper import WhisperModel; m=WhisperModel('tiny', device='cuda', compute_type='float16'); s,i=m.transcribe(np.zeros(16000,dtype='float32')); list(s); print('whisper cuda ok', i.language)"
@@ -102,11 +108,16 @@ if (Get-Command claude -ErrorAction SilentlyContinue) {
 Write-Step 'Manejo de errores'
 try { $null = Invoke-RestMethod "$api/api/process" -Method Post -ContentType 'application/json' -Body '{"upload_id":"no-existe","acknowledged":true}'
       Record 'errores' 'upload_id inexistente' $false 'aceptado (no debería)' }
-catch { Record 'errores' 'upload_id inexistente -> rechazo claro' $true $_.ErrorDetails.Message }
-$null = & $rv nuevo prueba-error 'C:\no\existe.mp4' 2>&1
-Record 'errores' 'rvshorts: video inexistente -> código 2' ($LASTEXITCODE -eq 2) "rc=$LASTEXITCODE"
-$null = & $rv --modelo 'modelo-que-no-existe' diagnostico 2>&1
-Record 'errores' 'rvshorts: modelo ausente detectado' ($LASTEXITCODE -ne 0) "rc=$LASTEXITCODE"
+catch {
+    $code = 0; if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+    Record 'errores' 'upload_id inexistente -> 404 con mensaje' ($code -eq 404) "HTTP $code $($_.ErrorDetails.Message)"
+}
+if (Test-Path $rv) {
+    $null = Invoke-Native $rv @('nuevo', 'prueba-error', 'C:\no\existe.mp4')
+    Record 'errores' 'rvshorts: video inexistente -> código 2' ($LASTEXITCODE -eq 2) "rc=$LASTEXITCODE"
+    $diag = (Invoke-Native $rv @('--modelo', 'modelo-que-no-existe', 'diagnostico')) -join ' '
+    Record 'errores' 'rvshorts: modelo ausente detectado' ($LASTEXITCODE -ne 0 -and $diag -match 'NO est') "rc=$LASTEXITCODE"
+} else { Record 'errores' 'rvshorts instalado' $false "falta $rv" }
 
 if (-not $SinPipeline) {
     Write-Step 'Pipeline completo (importar -> clip 9:16 -> metadatos -> H.265 -> revisión)'
@@ -129,10 +140,11 @@ if (-not $SinPipeline) {
     $clips = @(Get-ChildItem (Join-Path $pdir 'clips') -Filter *.mp4 -ErrorAction SilentlyContinue)
     Record 'pipeline' 'clips generados' ($clips.Count -ge 1) "$($clips.Count) en $pdir\clips"
     foreach ($cf in $clips) {
-        $pr = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height,codec_name -show_entries format=duration -of csv=p=0 $cf.FullName
-        $parts = ("$pr" -replace "`r?`n", ',') -split ','
-        $w = [int]$parts[1]; $hgt = [int]$parts[2]; $dur = [double]$parts[-1]
-        Record 'pipeline' "$($cf.Name) 9:16 y 15-60 s" ([math]::Abs($w / $hgt - 9 / 16) -lt 0.01 -and $dur -ge 14 -and $dur -le 61) "$pr"
+        $pj = (& ffprobe -v error -select_streams v:0 -show_entries 'stream=width,height:format=duration' -of json $cf.FullName) -join "`n" | ConvertFrom-Json
+        $w = [int]$pj.streams[0].width; $hgt = [int]$pj.streams[0].height
+        $dur = [double]::Parse($pj.format.duration, [Globalization.CultureInfo]::InvariantCulture)
+        $pr = "${w}x${hgt} $([math]::Round($dur,1))s"
+        Record 'pipeline' "$($cf.Name) 9:16 y 15-60 s" ($hgt -gt 0 -and [math]::Abs($w / $hgt - 9 / 16) -lt 0.01 -and $dur -ge 14 -and $dur -le 61) "$pr"
         $tr = Get-Content (Join-Path $pdir ("meta\{0}.transcript.json" -f $cf.BaseName)) -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
         Record 'pipeline' "$($cf.Name) transcripción por palabra" ($tr.captions.Count -gt 5) "$($tr.captions.Count) palabras · $($tr.language)"
         $meta = Get-Content (Join-Path $pdir ("meta\{0}.json" -f $cf.BaseName)) -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
