@@ -104,8 +104,7 @@ if ($ProbarGpuDocker -and $r.docker) {
 
 Write-Step 'Puertos y servicios existentes'
 $r.puertos = [ordered]@{}
-foreach ($p in $PORT_BACKEND, $PORT_FRONTEND, $PORT_RENDERER, $OLLAMA_MAIN_PORT, $OLLAMA_CPU_PORT,
-              $PORT_COMFYUI, $PORT_COMFYUI_ALT, $PORT_RENDERVIBE) {
+foreach ($p in @($PORT_BACKEND, $PORT_FRONTEND, $PORT_RENDERER) + $RESERVED_PORTS) {
     $own = Get-PortOwner $p; $r.puertos["$p"] = $own
     if ($own) { Write-Host "  :$p ocupado por $own" } else { Write-Host "  :$p libre" }
 }
@@ -115,7 +114,7 @@ $r.comfyui_procesos = @($comfy | ForEach-Object { "PID $($_.ProcessId): $($_.Com
 if ($r.comfyui_procesos) { Write-Ok "ComfyUI en ejecución: $($r.comfyui_procesos -join ' | ')" }
 else { Write-Host '  ComfyUI no está en ejecución ahora (no es necesario).' }
 $r.comfyui_api = [ordered]@{}
-foreach ($p in $PORT_COMFYUI, $PORT_COMFYUI_ALT) {
+foreach ($p in $PORT_COMFYUI, $PORT_COMFYUI_ALT, 8188) {
     try {
         $s = Invoke-RestMethod "http://127.0.0.1:$p/system_stats" -TimeoutSec 3
         $q = Invoke-RestMethod "http://127.0.0.1:$p/queue" -TimeoutSec 3

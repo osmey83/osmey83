@@ -11,7 +11,8 @@ import json
 import os
 import urllib.request
 
-DEFAULT_URLS = "http://127.0.0.1:8189,http://127.0.0.1:8188"
+# 8195 = Comfy Desktop en este PC (auditoría 2026-11-17); 8189/8188 por si hay otra.
+DEFAULT_URLS = "http://127.0.0.1:8195,http://127.0.0.1:8189,http://127.0.0.1:8188"
 
 
 def comfy_busy(urls: str | None = None, timeout: float = 3.0) -> list[str]:

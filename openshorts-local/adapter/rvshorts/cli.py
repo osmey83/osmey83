@@ -24,8 +24,8 @@ from .project import Project, _read_json, _write_json
 DEFAULTS = {
     "OPENSHORTS_URL": "http://localhost:8000",
     "RVSHORTS_LLM_URL": "http://127.0.0.1:11435/v1",   # instancia Ollama solo-CPU
-    "RVSHORTS_LLM_MODEL": "qwen2.5:14b",
-    "RVSHORTS_PROYECTOS": os.path.join(os.path.expanduser("~"), "OpenShortsProyectos"),
+    "RVSHORTS_LLM_MODEL": "qwen2.5:7b-instruct",
+    "RVSHORTS_PROYECTOS": os.path.join(os.path.expanduser("~"), "OpenShortsProyectos"),  # el kit fija D:\\AI\\OpenShortsProyectos
 }
 
 

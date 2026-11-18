@@ -167,7 +167,7 @@ class _LLMHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.endswith("/models"):
             return _send(self, 200, {"object": "list",
-                                     "data": [{"id": "qwen2.5:14b"}, {"id": "llama3.1:8b"}]})
+                                     "data": [{"id": "qwen2.5:7b-instruct"}, {"id": "llama3.1:8b"}]})
         _send(self, 404, {})
 
     def do_POST(self):

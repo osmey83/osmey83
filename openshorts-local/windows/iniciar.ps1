@@ -49,7 +49,7 @@ if (-not $SinOllama) {
     $names = @($tags.models | ForEach-Object { $_.name })
     if ($names -notcontains $LLM_MODEL -and $names -notcontains "${LLM_MODEL}:latest") {
         Write-Warn2 "El modelo $LLM_MODEL no está descargado. Modelos disponibles: $($names -join ', ')"
-        $ans = Read-Host "¿Descargarlo ahora con 'ollama pull $LLM_MODEL' (~9 GB para 14b)? [s/N]"
+        $ans = Read-Host "¿Descargarlo ahora con 'ollama pull $LLM_MODEL' (puede ocupar varios GB)? [s/N]"
         if ($ans -match '^[sSyY]') {
             $prevHost = $env:OLLAMA_HOST; $prevEap = $ErrorActionPreference
             $env:OLLAMA_HOST = "127.0.0.1:$OLLAMA_CPU_PORT"; $ErrorActionPreference = 'Continue'

@@ -4,10 +4,10 @@
 
 $OS_REPO      = 'https://github.com/mutonby/openshorts.git'
 $OS_COMMIT    = 'c4b496a73747664d9d0864b19c34085303e90d14'   # auditado el 2026-11-17
-$OS_DIR       = 'C:\AI\openshorts'                           # instalación aislada
+$OS_DIR       = 'D:\AI\openshorts'                           # instalación aislada (D: tiene espacio; C: ~121 GB libres)
 $KIT_DIR      = Split-Path -Parent $PSScriptRoot             # ...\openshorts-local
 $STATE_DIR    = Join-Path $env:LOCALAPPDATA 'openshorts-local'
-$PROYECTOS    = Join-Path $env:USERPROFILE 'OpenShortsProyectos'
+$PROYECTOS    = 'D:\AI\OpenShortsProyectos'
 
 # Puertos del host. 8000/5175/3100 son los de OpenShorts; si están ocupados,
 # 01-instalar.ps1 elige otros y los guarda en config.local.ps1.
@@ -20,15 +20,18 @@ $PORT_RENDERER = 3100
 $OLLAMA_MAIN_PORT = 11434
 $OLLAMA_CPU_PORT  = 11435
 $OLLAMA_CTX       = 16384                 # OpenShorts necesita > 4096 (README)
-$LLM_MODEL        = 'qwen2.5:14b'         # el que recomienda OpenShorts; 8B si va lento
+# Ya descargado en este PC (auditoría 2026-11-17): sin descargas nuevas.
+# Alternativas instaladas: llama3.1:8b (por defecto de OpenShorts),
+# phi4:14b, mistral-small3.2:24b (mejor español, más lento en CPU).
+$LLM_MODEL        = 'qwen2.5:7b-instruct'
 
-# Puertos de servicios existentes que hay que respetar (según las skills
-# rendervibe-crew/inventory: Studio 8295, ComfyUI 8189; 8188 es el de ComfyUI
-# por defecto y se respeta también por si hay otra instalación).
-$PORT_COMFYUI     = 8189
-$PORT_COMFYUI_ALT = 8188
+# Puertos de servicios existentes que hay que respetar. Auditoría 2026-11-17:
+# Comfy Desktop corre ComfyUI en 8195 (--port 8195); RenderVibe Studio en 8295;
+# la config de RenderVibe cita además 8189-8191 y 8297. 8188 = ComfyUI por defecto.
+$PORT_COMFYUI     = 8195
+$PORT_COMFYUI_ALT = 8189
 $PORT_RENDERVIBE  = 8295
-$RESERVED_PORTS   = @($PORT_COMFYUI, $PORT_COMFYUI_ALT, $PORT_RENDERVIBE, 11434, 11435)
+$RESERVED_PORTS   = @(8188, 8189, 8190, 8191, 8195, 8295, 8297, 11434, 11435)
 
 $local = Join-Path $PSScriptRoot 'config.local.ps1'
 if (Test-Path $local) { . $local }

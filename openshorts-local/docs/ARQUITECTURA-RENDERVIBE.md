@@ -3,7 +3,7 @@
 Estado: **propuesta, nada implementado en RenderVibe**. No se ha leído el código
 de `Miniserie-Studio`, que está en tu PC y no era accesible desde esta sesión. Lo
 que sigue se basa en tus skills `rendervibe-*`, leídas en modo solo lectura:
-puertos Studio **8295**, ComfyUI **8189**, Ollama **11434**; `.venv` propio;
+puertos Studio **8295**, ComfyUI **8189** según las skills, pero la auditoría del 2026-11-17 muestra Comfy Desktop en **8195**; Ollama **11434**; `.venv` propio;
 `backend.launcher.busy_reason()`; `COORDINACION.md` y `colaboracion/`;
 `backups/`; salida probada Full HD H.264 a 24 fps; `montaje/` y
 `publicacion/<episodio>/`. Hay que contrastarlo con el informe de `00-auditar.ps1`.
@@ -24,9 +24,9 @@ clip-review (QA) <──────────── clips/ + meta/clip_NN.md
 - **Sin imports cruzados**: RenderVibe nunca importa `rvshorts` ni OpenShorts.
   Solo invoca la CLI o lee JSON. Cada uno conserva su Python (`.venv` de RenderVibe,
   `venv-rvshorts`, contenedor de OpenShorts): no hay conflictos de dependencias.
-- **Puertos sin solapes**: 8295 (Studio), 8189/8188 (ComfyUI), 11434 (Ollama
+- **Puertos sin solapes**: 8295 (Studio), 8195 (Comfy Desktop), 8189-8191/8297 (citados por RenderVibe), 8188, 11434 (Ollama
   principal), 11435 (Ollama CPU del kit), 8000/5175/3100 (OpenShorts, o los
-  alternativos que elija el instalador). El instalador nunca toma 8188/8189/8295/11434/11435.
+  alternativos que elija el instalador). El instalador nunca toma ninguno de esos puertos.
 - **GPU**: ComfyUI tiene prioridad. `rvshorts procesar` consulta `/queue` de ComfyUI y
   no lanza si hay renders en curso o pendientes (salvo `--ignorar-cola`). Whisper
   large-v3-turbo usa poca VRAM comparado con Wan/LTX, pero no se arriesgan los renders.

@@ -5,12 +5,13 @@ description: Produce vertical clips (YouTube Shorts, TikTok, Reels) from LOCAL v
 
 # rvshorts: clips verticales locales con aprobación manual
 
-CLI: `%LOCALAPPDATA%\openshorts-local\venv-rvshorts\Scripts\rvshorts.exe`
-(en adelante `rvshorts`). Proyectos en `%USERPROFILE%\OpenShortsProyectos\<proyecto>`.
+CLI: `%LOCALAPPDATA%\openshorts-local\rvshorts.cmd` (en adelante `rvshorts`;
+ya lleva el puerto, el modelo y la carpeta de este equipo).
+Proyectos en `D:\AI\OpenShortsProyectos\<proyecto>`.
 
 ## Antes de empezar
 1. `rvshorts diagnostico` — OpenShorts, Ollama CPU (:11435) y encoders. Si falla,
-   pide al usuario ejecutar `openshorts-local\windows\iniciar.ps1`.
+   pide al usuario ejecutar `D:\Comfy Desktop\openshorts-local\windows\iniciar.ps1`.
 2. El video debe durar **más de 45 s** (OpenShorts lo exige) y el usuario debe
    tener derechos sobre él: `procesar` lo declara (`acknowledged: true`).
 

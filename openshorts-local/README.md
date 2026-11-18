@@ -24,10 +24,10 @@ Claude Code ──MCP (http://localhost:8000/mcp, 8 herramientas)──┐
                               │                             └─ selector de momentos ──> Ollama CPU :11435
                               ├─ enriquecer ──────────────────────────────────────────> Ollama CPU :11435
                               ├─ exportar H.264/H.265 ──> FFmpeg del host (h264/hevc_nvenc o x264/x265)
-                              ├─ guarda de VRAM ──> ComfyUI :8189/:8188 /queue (no lanza si hay renders)
+                              ├─ guarda de VRAM ──> ComfyUI :8195/:8189/:8188 /queue (no lanza si hay renders)
                               └─ proyectos/<p>/ ... review.json ──> publish_queue.json (nunca publica)
 
-Tu Ollama principal :11434, ComfyUI :8189 y RenderVibe Studio :8295 no se tocan.
+Tu Ollama principal :11434, ComfyUI (Comfy Desktop) :8195 y RenderVibe Studio :8295 no se tocan.
 ```
 
 **¿Por qué una segunda instancia de Ollama?** Pediste el LLM en CPU para dejar la
@@ -47,7 +47,7 @@ adaptador, que usa la biblioteca estándar) y Ollama. Desde `openshorts-local\wi
 # 0. Auditoría SOLO LECTURA (versiones, driver, NVENC, puertos, ComfyUI, RenderVibe)
 powershell -ExecutionPolicy Bypass -File .\00-auditar.ps1 -ProbarGpuDocker
 
-# 1. Clona OpenShorts en C:\AI\openshorts (commit fijado), .env, override GPU, venv del adaptador, build
+# 1. Clona OpenShorts en D:\AI\openshorts (commit fijado), .env, override GPU, venv del adaptador, build
 powershell -ExecutionPolicy Bypass -File .\01-instalar.ps1
 
 # 2. Arranca Ollama-CPU (:11435) y los contenedores
@@ -67,12 +67,12 @@ Lo que el instalador **no** hace: no instala ni actualiza drivers, CUDA, PyTorch
 Ollama, ComfyUI ni Node; no cambia variables de entorno globales; no
 sobrescribe `.env` ni el override sin `-Forzar`, y aun con `-Forzar` guarda antes
 una copia `.bak-<fecha>`. Si los puertos 8000/5175/3100 están ocupados, elige
-otros libres (sin tocar 8188/8189/8295/11434/11435).
+otros libres (sin tocar 8188-8191, 8195, 8295, 8297, 11434, 11435).
 
 ## Uso diario
 
 ```powershell
-$rv = "$env:LOCALAPPDATA\openshorts-local\venv-rvshorts\Scripts\rvshorts.exe"
+$rv = "$env:LOCALAPPDATA\openshorts-local\rvshorts.cmd"   # lo genera 01-instalar.ps1 con tu puerto/modelo/carpeta
 & $rv diagnostico
 & $rv pipeline "Episodio 03" "D:\Grabaciones\ep03.mp4" --codec h265
 & $rv revisar "Episodio 03"
@@ -84,7 +84,7 @@ O, en Claude Code: *"Saca 3 shorts de D:\Grabaciones\ep03.mp4 con rvshorts y
 enséñame los ganchos"*. La skill `rvshorts` sabe usar la CLI y tiene prohibido
 publicar o aprobar por su cuenta.
 
-Cada proyecto queda así: `%USERPROFILE%\OpenShortsProyectos\<proyecto>\`
+Cada proyecto queda así: `D:\AI\OpenShortsProyectos\<proyecto>\`
 `clips\` (9:16 de OpenShorts) · `meta\clip_NN.md|.json` (ganchos, títulos,
 descripciones, hashtags, narrativa, análisis) · `exports\` (H.264/H.265) ·
 `review.json` · `publish_queue.json` (solo los aprobados, `"published": false`).
@@ -120,8 +120,12 @@ necesitan Gemini, fal.ai o ElevenLabs: quedan fuera de un pipeline 100 % local.
 
 | Uso | Modelo | Dónde | Motivo |
 |---|---|---|---|
-| Momentos, títulos y descripciones (OpenShorts) + enriquecimiento | `qwen2.5:14b` | Ollama CPU :11435 | Lo recomienda el README de OpenShorts; JSON fiable (según OpenShorts, los 7-8B van bien y los 3B no) |
-| Alternativa más rápida | `llama3.1:8b` (el valor por defecto de OpenShorts) | Ollama CPU | Si el 14B va lento en tu CPU: `01-instalar.ps1 -Modelo llama3.1:8b -Forzar -SinConstruir` |
+| Momentos, títulos y descripciones (OpenShorts) + enriquecimiento | `qwen2.5:7b-instruct` | Ollama CPU :11435 | **Ya está descargado en tu PC**; buen español; según OpenShorts los 7-8B devuelven JSON fiable y los 3B no |
+| Más calidad (más lento en CPU) | `mistral-small3.2:24b` o `phi4:14b` (ya descargados) | Ollama CPU | `01-instalar.ps1 -Modelo mistral-small3.2:24b -Forzar -SinConstruir` |
+| Alternativa | `llama3.1:8b` (valor por defecto de OpenShorts, ya descargado) | Ollama CPU | Mismo comando con `-Modelo llama3.1:8b` |
+
+Se evitan a propósito `qwen3:*` y `deepseek-r1:*`: son modelos que "piensan" en voz alta
+antes de responder, y eso puede romper el JSON que esperan OpenShorts y el adaptador (sin verificar en tu equipo).
 | Transcripción | `large-v3-turbo` fp16 | RTX 5090 (CUDA) | Configuración GPU del README; `parakeet` es opcional y más rápido en idiomas europeos |
 | Seguimiento / escenas | YOLOv8, MediaPipe, TransNetV2 | Imagen de OpenShorts | Los descarga la propia imagen |
 

@@ -211,7 +211,17 @@ $pipOut = Invoke-Native (Join-Path $venv 'Scripts\python.exe') @('-m', 'pip', 'i
 if ($LASTEXITCODE -ne 0) { Write-Host ($pipOut -join "`n") }
 if ($LASTEXITCODE -ne 0) { throw 'pip install del adaptador falló' }
 New-Item -ItemType Directory -Path $PROYECTOS -Force | Out-Null
-Write-Ok "rvshorts en $venv · proyectos en $PROYECTOS"
+# Lanzador con la configuración de ESTE equipo (puerto, modelo, carpeta), sin
+# variables de entorno globales: rvshorts.cmd <comando> ...
+$launcher = Join-Path $STATE_DIR 'rvshorts.cmd'
+$cmdBody = "@echo off`r`n" +
+    "set OPENSHORTS_URL=http://localhost:$pb`r`n" +
+    "set RVSHORTS_LLM_URL=http://127.0.0.1:$OLLAMA_CPU_PORT/v1`r`n" +
+    "set RVSHORTS_LLM_MODEL=$LLM_MODEL`r`n" +
+    "set RVSHORTS_PROYECTOS=$PROYECTOS`r`n" +
+    "`"%~dp0venv-rvshorts\Scripts\rvshorts.exe`" %*`r`n"
+[IO.File]::WriteAllText($launcher, $cmdBody, (New-Object Text.ASCIIEncoding))
+Write-Ok "rvshorts: $launcher · proyectos en $PROYECTOS"
 
 # --- 6. Imagen ----------------------------------------------------------------
 if ($SinConstruir) { Write-Warn2 'Construcción omitida (-SinConstruir).'; return }
