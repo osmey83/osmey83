@@ -78,6 +78,7 @@ $rv = "$env:LOCALAPPDATA\openshorts-local\rvshorts.cmd"   # lo genera 01-instala
 & $rv revisar "Episodio 03"
 & $rv aprobar "Episodio 03" 1 --nota "gancho fuerte"
 & $rv analizar-guion "D:\Miniserie\guiones\ep04.txt"
+& $rv pipeline "Charla X" "https://www.youtube.com/watch?v=..."   # también enlaces de YouTube
 ```
 
 O, en Claude Code: *"Saca 3 shorts de D:\Grabaciones\ep03.mp4 con rvshorts y
@@ -94,6 +95,7 @@ descripciones, hashtags, narrativa, análisis) · `exports\` (H.264/H.265) ·
 | Función pedida | OpenShorts (nativo) | Kit (`rvshorts`) |
 |---|---|---|
 | Importar videos locales | Sí: subida en el panel, `POST /api/uploads`, MCP `create_upload` | Subida en streaming desde la CLI |
+| Enlaces de YouTube | Sí: los descarga con yt-dlp; avisa si hay menos de 720p; para vídeos que YouTube bloquea, `YOUTUBE_COOKIES` en `.env` | `pipeline <proyecto> <url>`; `--forzar-baja-calidad` |
 | Transcribir | Sí: faster-whisper (CUDA) o Parakeet, por palabra | — |
 | Detectar segmentos interesantes | Sí: escenas + LLM (Ollama vía `LLM_BASE_URL`) | — |
 | Clips de 15 a 60 s | Sí (`clip_min/max_seconds`, mínimo de fuente 45 s) | — |

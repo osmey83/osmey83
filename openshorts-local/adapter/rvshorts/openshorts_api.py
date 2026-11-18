@@ -89,10 +89,14 @@ class OpenShortsClient:
             })
         return slot["upload_id"]
 
-    def process(self, upload_id: str, *, target_clips: Optional[int] = None,
+    def process(self, upload_id: Optional[str] = None, *, url: Optional[str] = None,
+                target_clips: Optional[int] = None,
                 clip_min: int = 15, clip_max: int = 60, layouts: Optional[list] = None,
-                captions: bool = True, auto_hook: bool = True) -> str:
-        body: dict = {"upload_id": upload_id, "acknowledged": True,
+                captions: bool = True, auto_hook: bool = True,
+                force_low_quality: bool = False) -> str:
+        if bool(upload_id) == bool(url):
+            raise ValueError("process() necesita upload_id o url (solo uno)")
+        body: dict = {"acknowledged": True, "force_low_quality": force_low_quality,
                       "output_format": "vertical",
                       "clip_min_seconds": clip_min, "clip_max_seconds": clip_max,
                       "captions": captions, "auto_hook": auto_hook}
@@ -100,10 +104,19 @@ class OpenShortsClient:
             body["target_clips"] = int(target_clips)
         if layouts:
             body["layouts"] = layouts
-        resp = self._request("POST", "/api/process", body, timeout=120)
-        if resp.get("status") == "needs_confirmation":
-            raise OpenShortsError("OpenShorts pide confirmación de baja calidad: "
-                                  + json.dumps(resp, ensure_ascii=False)[:300])
+        if url:
+            body["url"] = url
+        else:
+            body["upload_id"] = upload_id
+        resp = self._request("POST", "/api/process", body, timeout=300)
+        # app.py::_quality_gate responde 200 con {"needs_confirmation": true, ...}
+        if resp.get("needs_confirmation"):
+            q = resp.get("quality_check") or {}
+            raise OpenShortsError(
+                f"La mejor calidad disponible es {q.get('max_height')}p (mínimo "
+                f"{q.get('min_height')}p). Si aun así lo quieres, repite con "
+                "--forzar-baja-calidad." + (" Las cookies de YouTube parecen no válidas."
+                                             if q.get("cookies_invalid") else ""))
         job_id = resp.get("job_id")
         if not job_id:
             raise OpenShortsError(f"Respuesta sin job_id: {resp}")

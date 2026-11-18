@@ -17,7 +17,7 @@ Proyectos en `D:\AI\OpenShortsProyectos\<proyecto>`.
 
 ## Flujo
 ```
-rvshorts pipeline "<proyecto>" "<ruta\video.mp4>" [--clips N] [--codec h265]
+rvshorts pipeline "<proyecto>" "<ruta\video.mp4 | https://youtube.com/watch?v=...>" [--clips N] [--codec h265]
 ```
 equivale a `nuevo` → `procesar` → `descargar` → `enriquecer` → `exportar` y
 termina en `revisar`. Pasos sueltos:

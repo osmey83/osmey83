@@ -58,11 +58,17 @@ class Project:
     # -- creación / carga -------------------------------------------------
     @classmethod
     def create(cls, root: str, name: str, source_video: str, copy: bool = False) -> "Project":
-        if not os.path.isfile(source_video):
+        is_url = source_video.lower().startswith(("http://", "https://"))
+        if not is_url and not os.path.isfile(source_video):
             raise FileNotFoundError(f"No existe el video: {source_video}")
         p = cls(root, name)
         for sub in cls.SUBDIRS:
             os.makedirs(os.path.join(p.dir, sub), exist_ok=True)
+        if is_url:   # YouTube u otro enlace: lo descarga OpenShorts (yt-dlp)
+            data = p.load() or {"name": name, "slug": p.slug, "created": _now(), "jobs": []}
+            data["source"] = {"url": source_video}
+            p.save(data)
+            return p
         src = os.path.abspath(source_video)
         if copy:
             dest = os.path.join(p.dir, "source", os.path.basename(src))

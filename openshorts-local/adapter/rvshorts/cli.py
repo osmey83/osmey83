@@ -81,7 +81,7 @@ def cmd_nuevo(args) -> int:
 def cmd_procesar(args) -> int:
     os_client, _ = _clients(args)
     p = Project(args.raiz, args.nombre)
-    src = p.require()["source"]["path"]
+    source = p.require()["source"]
     busy = comfy_busy()
     if busy and not args.ignorar_cola:
         log("ComfyUI tiene renders activos; no se lanza OpenShorts para no competir por la VRAM:")
@@ -89,12 +89,16 @@ def cmd_procesar(args) -> int:
             log(f"  · {b}")
         log("Espera a que termine la cola o repite con --ignorar-cola.")
         return 3
-    log(f"Subiendo {src} a OpenShorts…")
-    upload_id = os_client.upload(src)
     opts = {"target_clips": args.clips, "clip_min": args.min, "clip_max": args.max,
             "layouts": args.layouts.split(",") if args.layouts else None,
-            "captions": not args.sin_subtitulos, "auto_hook": not args.sin_gancho}
-    job_id = os_client.process(upload_id, **opts)
+            "captions": not args.sin_subtitulos, "auto_hook": not args.sin_gancho,
+            "force_low_quality": args.forzar_baja_calidad}
+    if source.get("url"):
+        log(f"OpenShorts descargará {source['url']} (puede tardar)…")
+        job_id = os_client.process(url=source["url"], **opts)
+    else:
+        log(f"Subiendo {source['path']} a OpenShorts…")
+        job_id = os_client.process(os_client.upload(source["path"]), **opts)
     p.add_job(job_id, opts)
     log(f"Trabajo enviado: {job_id}")
     if args.esperar:
@@ -268,6 +272,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--esperar", action="store_true")
         sp.add_argument("--ignorar-cola", action="store_true",
                         help="lanzar aunque ComfyUI tenga renders en cola")
+        sp.add_argument("--forzar-baja-calidad", action="store_true",
+                        help="aceptar un enlace por debajo de 720p")
 
     def dl_opts(sp):
         sp.add_argument("--job", default=None)

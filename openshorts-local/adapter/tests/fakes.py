@@ -107,7 +107,12 @@ class _OSHandler(BaseHTTPRequestHandler):
             self.s.process_bodies.append(body)
             if not body.get("acknowledged"):
                 return _send(self, 400, {"detail": "rights not acknowledged"})
-            if body.get("upload_id") not in self.s.uploads:
+            url = body.get("url")
+            if url:   # como app.py::_quality_gate
+                if "baja" in url and not body.get("force_low_quality"):
+                    return _send(self, 200, {"needs_confirmation": True, "quality_check": {
+                        "max_height": 480, "min_height": 720, "cookies_invalid": False}})
+            elif body.get("upload_id") not in self.s.uploads:
                 return _send(self, 404, {"detail": "Unknown or expired upload_id"})
             jid = str(uuid.uuid4())
             self.s.jobs[jid] = {"polls": 0}

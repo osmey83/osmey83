@@ -262,3 +262,42 @@ def test_reprocessing_never_inherits_old_approvals(tmp_path, monkeypatch):
         assert len(os.listdir(os.path.join(old, "clips"))) == 2
     finally:
         os_srv.close(); llm_srv.close()
+
+
+# --- enlaces de YouTube ------------------------------------------------------
+
+@needs_ffmpeg
+def test_youtube_url_is_sent_as_url_not_uploaded(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("RVSHORTS_COMFY_URLS", "http://127.0.0.1:9")
+    clip = make_test_clip(str(tmp_path / "clip.mp4"), w=1080, h=1920, seconds=2)
+    os_srv, llm_srv = FakeOpenShorts(clip, n_clips=1), FakeLLM()
+    base = ["--openshorts", os_srv.url, "--llm-url", llm_srv.url + "/v1",
+            "--raiz", str(tmp_path / "p")]
+    url = "https://www.youtube.com/watch?v=abc123"
+    try:
+        assert main(base + ["pipeline", "yt", url, "--intervalo", "0.01"]) == 0
+        body = os_srv.process_bodies[0]
+        assert body["url"] == url and "upload_id" not in body
+        assert body["acknowledged"] is True and body["force_low_quality"] is False
+        assert os_srv.uploads == {}                                   # nada subido
+        p = Project(str(tmp_path / "p"), "yt")
+        assert p.require()["source"] == {"url": url}
+        assert len(p.clip_files()) == 1
+    finally:
+        os_srv.close(); llm_srv.close()
+
+
+def test_low_quality_link_asks_before_forcing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("RVSHORTS_COMFY_URLS", "http://127.0.0.1:9")
+    os_srv = FakeOpenShorts(__file__)
+    base = ["--openshorts", os_srv.url, "--raiz", str(tmp_path / "p")]
+    url = "https://youtu.be/baja-resolucion"
+    try:
+        assert main(base + ["nuevo", "lq", url]) == 0
+        assert main(base + ["procesar", "lq"]) == 2
+        err = capsys.readouterr().err
+        assert "480p" in err and "--forzar-baja-calidad" in err
+        assert main(base + ["procesar", "lq", "--forzar-baja-calidad"]) == 0
+        assert os_srv.process_bodies[-1]["force_low_quality"] is True
+    finally:
+        os_srv.close()
